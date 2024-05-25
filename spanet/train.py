@@ -49,7 +49,7 @@ def main(
         limit_dataset: Optional[float],
         random_seed: int,
     ):
-
+    print("CUDA Version:", torch.version.cuda)
     # Whether or not this script version is the master run or a worker
     master = True
     if "NODE_RANK" in environ:
