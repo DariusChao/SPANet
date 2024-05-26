@@ -79,8 +79,6 @@ def main(
     if gpus is not None:
         if master:
             print(f"Overriding GPU count: {gpus}")
-            print("hellow world")
-            print("CUDA Version:", torch.version.cuda)
         options.num_gpu = gpus
 
     if batch_size is not None:
