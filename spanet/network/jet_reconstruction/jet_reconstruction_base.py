@@ -54,16 +54,10 @@ class JetReconstructionBase(pl.LightningModule):
         # self.steps_per_epoch = len(self.training_dataset) // self.options.batch_size
         self.total_steps = self.steps_per_epoch * self.options.epochs
         self.warmup_steps = int(round(self.steps_per_epoch * self.options.learning_rate_warmup_epochs))
-
-        self.dataloader = DataModule({"batch_size": self.options.batch_size, "pin_memory": self.options.num_gpu > 0, "num_workers": self.options.num_dataloader_workers}, self.training_dataset, self.validation_dataset, self.testing_dataset)
-
+        
     @property
     def dataset(self):
         return JetReconstructionDataset
-
-    @property
-    def dataloader(self):
-        return self.dataloader
 
     @property
     def event_info(self):
