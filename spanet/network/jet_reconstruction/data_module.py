@@ -8,9 +8,17 @@ class DataModule(LightningDataModule):
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
         self.test_dataset = test_dataset
+        
+    def prepare_data(self):
+        pass
+
+    def setup(self, stage: str):
+        if stage == "fit":
+            self.train_dataset, self.val_dataset = self.train_dataset, self.val_dataset
+        if stage == "test":
+            self.test_dataset = self.test_dataset
 
     def train_dataloader(self):
-        print("train dataloader options", *self.dataloader_options.items())
         return DataLoader(self.train_dataset, shuffle=True, drop_last=True, **self.dataloader_options)
 
     def val_dataloader(self):
