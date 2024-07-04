@@ -3,9 +3,7 @@ import numpy as np
 import torch
 from torch import nn
 
-# noinspection PyProtectedMember
-from torch.utils.data import DataLoader
-
+from spanet.network.jet_reconstruction import DataModule
 from spanet.options import Options
 from spanet.dataset.jet_reconstruction_dataset import JetReconstructionDataset
 from spanet.network.learning_rate_schedules import get_linear_schedule_with_warmup
@@ -57,21 +55,15 @@ class JetReconstructionBase(pl.LightningModule):
         self.total_steps = self.steps_per_epoch * self.options.epochs
         self.warmup_steps = int(round(self.steps_per_epoch * self.options.learning_rate_warmup_epochs))
 
+        self.dataloader = DataModule({"batch_size": self.options.batch_size, "pin_memory": self.options.num_gpu > 0, "num_workers": self.options.num_dataloader_workers}, self.training_dataset, self.validation_dataset, self.testing_dataset)
+
     @property
     def dataset(self):
         return JetReconstructionDataset
 
     @property
     def dataloader(self):
-        return DataLoader
-
-    @property
-    def dataloader_options(self):
-        return {
-            "batch_size": self.options.batch_size,
-            "pin_memory": self.options.num_gpu > 0,
-            "num_workers": self.options.num_dataloader_workers,
-        }
+        return self.dataloader
 
     @property
     def event_info(self):
@@ -191,16 +183,3 @@ class JetReconstructionBase(pl.LightningModule):
         }
 
         return [optimizer], [scheduler]
-
-    def train_dataloader(self) -> DataLoader:
-        print("train dataloader options", *self.dataloader_options.items())
-        return self.dataloader(self.training_dataset, shuffle=True, drop_last=True, **self.dataloader_options)
-
-    def val_dataloader(self) -> DataLoader:
-        return self.dataloader(self.validation_dataset, drop_last=True, **self.dataloader_options)
-
-    def test_dataloader(self) -> DataLoader:
-        if self.testing_dataset is None:
-            raise ValueError("Testing dataset not provided.")
-
-        return self.dataloader(self.testing_dataset, **self.dataloader_options)
