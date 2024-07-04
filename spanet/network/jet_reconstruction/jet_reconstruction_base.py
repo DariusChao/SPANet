@@ -48,6 +48,7 @@ class JetReconstructionBase(pl.LightningModule):
         # Helper arrays for permutation groups. Used for the partial-event loss functions.
         event_permutation_group = np.array(self.event_info.event_permutation_group)
         self.event_permutation_tensor = torch.nn.Parameter(torch.from_numpy(event_permutation_group), False)
+        self.event_permutation_list = self.event_permutation_tensor.tolist()
 
         # Helper variables for keeping track of the number of batches in each epoch.
         # Used for learning rate scheduling and other things.
@@ -192,6 +193,7 @@ class JetReconstructionBase(pl.LightningModule):
         return [optimizer], [scheduler]
 
     def train_dataloader(self) -> DataLoader:
+        print("train dataloader options", *self.dataloader_options.items())
         return self.dataloader(self.training_dataset, shuffle=True, drop_last=True, **self.dataloader_options)
 
     def val_dataloader(self) -> DataLoader:

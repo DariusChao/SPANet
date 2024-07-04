@@ -141,22 +141,8 @@ def main(
     callbacks = [
         ModelCheckpoint(
             verbose=options.verbose_output,
-            filename='{epoch}-{step}-{validation_accuracy:.2f}',
-            monitor='validation_accuracy',
-            save_top_k=3,
-            mode='max',
-        ),
-        ModelCheckpoint(
-            verbose=options.verbose_output,
-            filename='{epoch}-{step}-{validation_accuracy_epoch:.2f}',
-            monitor='validation_accuracy_epoch',
-            save_top_k=3,
-            mode='max',
-        ),
-        ModelCheckpoint(
-            verbose=options.verbose_output,
-            filename='{epoch}-{step}-{validation_average_jet_accuracy_epoch:.2f}',
-            monitor='validation_average_jet_accuracy_epoch',
+            filename='{epoch}-{step}-{validation_average_jet_accuracy:.3f}',
+            monitor='validation_average_jet_accuracy',
             save_top_k=3,
             mode='max',
             save_last=True
@@ -175,7 +161,7 @@ def main(
 
     # Create the final pytorch-lightning manager
     trainer = pl.Trainer(
-        accelerator="gpu" if options.num_gpu > 0 else "auto",
+        accelerator="gpu" if options.num_gpu > 0 else "cpu",
         devices=options.num_gpu if options.num_gpu > 0 else "auto",
         strategy="ddp" if options.num_gpu > 1 else "auto",
         precision="16-mixed" if fp16 else "32-true",

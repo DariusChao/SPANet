@@ -443,6 +443,7 @@ class JetReconstructionDataset(Dataset):
         return self.num_events
 
     def __getitem__(self, item) -> Batch:
+        print(f"Device {torch.cuda.current_device()} getting item")
         sources = tuple(
             source[item]
             for source in self.sources.values()

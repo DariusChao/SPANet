@@ -16,9 +16,6 @@ class JetReconstructionValidation(JetReconstructionNetwork):
     def __init__(self, options: Options, torch_script: bool = False):
         super(JetReconstructionValidation, self).__init__(options, torch_script)
         self.evaluator = SymmetricEvaluator(self.training_dataset.event_info)
-        if self.balance_particles:
-            self.particle_index_tensor_np = self.particle_index_tensor.cpu().detach().numpy()
-            self.particle_weights_tensor_np = self.particle_weights_tensor.cpu().detach().numpy()
         # self.validation_step_metrics_outputs = []
 
     @property
@@ -38,6 +35,7 @@ class JetReconstructionValidation(JetReconstructionNetwork):
         }
 
     def compute_metrics(self, jet_predictions, particle_scores, stacked_targets, stacked_masks):
+        print("Start compute metrics")
         event_permutation_group = self.event_permutation_tensor.cpu().numpy()
         num_permutations = len(event_permutation_group)
         num_targets, batch_size = stacked_masks.shape
@@ -93,23 +91,27 @@ class JetReconstructionValidation(JetReconstructionNetwork):
         # early stopping, hyperparameter optimization, learning rate scheduling, etc.
         metrics["validation_accuracy"] = metrics[f"jet/accuracy_{num_targets}_of_{num_targets}"]
 
+        print("start validation_average_jet_accuracy")
+        print("calc jfta")
 
-        jet_full_target_accuracies = np.zeros((batch_size), dtype=float)
-        for i in range(1, num_targets + 1):
-            has_i_target = num_particles == i
-            jet_full_target_accuracies[has_i_target] = jet_accuracies[has_i_target] / i
+        jet_full_target_accuracies = jet_accuracies / np.clip(num_particles, a_min=1.0, a_max=None)
+
+        print("init weight")
 
         weights = np.ones_like(jet_full_target_accuracies)
-        if self.balance_particles:
-            class_indices = (stacked_masks * self.particle_index_tensor_np[..., np.newaxis]).sum(0)
-            weights *= self.particle_weights_tensor_np[class_indices]
+
+        print('calc vaja')
 
         metrics["validation_average_jet_accuracy"] = (jet_full_target_accuracies * weights).sum() / weights.sum()
+
+        print("finishing vaja")
+        print("return from compute metrics")
 
         return metrics
 
     def validation_step(self, batch, batch_idx) -> Dict[str, np.float32]:
         # Run the base prediction step
+        print("Start validation")
         sources, num_jets, targets, regression_targets, classification_targets = batch
         jet_predictions, particle_scores, regressions, classifications = self.predict(sources)
 
@@ -142,7 +144,11 @@ class JetReconstructionValidation(JetReconstructionNetwork):
                     prediction[:, indices] = np.sort(prediction[:, indices])
                     target[:, indices] = np.sort(target[:, indices])
 
+        print("before update")
+
         metrics.update(self.compute_metrics(jet_predictions, particle_scores, stacked_targets, stacked_masks))
+
+        print("after update")
 
         for key in regressions:
             delta = regressions[key] - regression_targets[key]
@@ -163,11 +169,16 @@ class JetReconstructionValidation(JetReconstructionNetwork):
             accuracy = (classifications[key] == classification_targets[key])
             self.log(f"CLASSIFICATION/{key}_accuracy", accuracy.mean(), sync_dist=True)
 
+        print("logging")
+
         for name, value in metrics.items():
             if not np.isnan(value):
-                self.log(name, value, sync_dist=True, on_step=True, on_epoch=True)
+                self.log(name, value, sync_dist=True, on_epoch=True)
 
         # self.validation_step_metrics_outputs.append(metrics)
+
+        print("after logging")
+        print("return from validation step")
 
         return metrics
 

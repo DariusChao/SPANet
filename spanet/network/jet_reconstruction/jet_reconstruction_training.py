@@ -41,24 +41,27 @@ class JetReconstructionTraining(JetReconstructionNetwork):
         ))
 
     def compute_symmetric_losses(self, assignments: List[Tensor], detections: List[Tensor], targets):
-        symmetric_losses = []
 
         # TODO think of a way to avoid this memory transfer but keep permutation indices synced with checkpoint
-        # Compute a separate loss term for every possible target permutation.
-        for permutation in self.event_permutation_tensor.cpu().numpy():
-
-            # Find the assignment loss for each particle in this permutation.
-            current_permutation_loss = tuple(
+        # Assuming event_permutation_tensor is on GPU and can be indexed directly
+        permutation_losses = []
+        for permutation in self.event_permutation_list:
+            # Directly use GPU tensors for operations
+            # print("permutation", permutation)
+            # print("targets", targets)
+            # print(*permutation)
+            permuted_targets = [targets[i] for i in permutation] 
+            perm_losses = [
                 self.particle_symmetric_loss(assignment, detection, target, mask)
                 for assignment, detection, (target, mask)
-                in zip(assignments, detections, targets[permutation])
-            )
+                in zip(assignments, detections, permuted_targets)
+            ]
+            permutation_losses.append(torch.stack(perm_losses))
 
-            # The loss for a single permutation is the sum of particle losses.
-            symmetric_losses.append(torch.stack(current_permutation_loss))
+        # Reduce across permutations to get the final loss tensor
+        symmetric_losses = torch.stack(permutation_losses)
+        return symmetric_losses 
 
-        # Shape: (NUM_PERMUTATIONS, NUM_PARTICLES, 2, BATCH_SIZE)
-        return torch.stack(symmetric_losses)
 
     def combine_symmetric_losses(self, symmetric_losses: Tensor) -> Tuple[Tensor, Tensor]:
         # Default option is to find the minimum loss term of the symmetric options.
@@ -94,7 +97,7 @@ class JetReconstructionTraining(JetReconstructionNetwork):
                        for prediction, decoder in zip(assignments, self.branch_decoders)]
 
         # Convert the targets into a numpy array of tensors so we can use fancy indexing from numpy
-        targets = numpy_tensor_array(targets)
+        # targets = numpy_tensor_array(targets)
 
         # Compute the loss on every valid permutation of the targets
         symmetric_losses = self.compute_symmetric_losses(assignments, detections, targets)
@@ -201,10 +204,12 @@ class JetReconstructionTraining(JetReconstructionNetwork):
         return total_loss + classification_terms
 
     def training_step(self, batch: Batch, batch_nb: int) -> Dict[str, Tensor]:
+        print("training_step starts: Begin forward")
         # ===================================================================================================
         # Network Forward Pass
         # ---------------------------------------------------------------------------------------------------
         outputs = self.forward(batch.sources)
+        print("Passed SPANet")
 
         # ===================================================================================================
         # Initial log-likelihood loss for classification task
@@ -245,15 +250,19 @@ class JetReconstructionTraining(JetReconstructionNetwork):
         # Some basic logging
         # ---------------------------------------------------------------------------------------------------
         with torch.no_grad():
+            print("logging assignment loss")
             for name, l in zip(self.training_dataset.assignments, assignment_loss):
                 self.log(f"loss/{name}/assignment_loss", l, sync_dist=True)
 
+            print("logging detectioin loss")
             for name, l in zip(self.training_dataset.assignments, detection_loss):
                 self.log(f"loss/{name}/detection_loss", l, sync_dist=True)
 
+            print("check nan")
             if torch.isnan(assignment_loss).any():
                 raise ValueError("Assignment loss has diverged!")
 
+            print("check inf")
             if torch.isinf(assignment_loss).any():
                 raise ValueError("Assignment targets contain a collision.")
 
@@ -287,4 +296,5 @@ class JetReconstructionTraining(JetReconstructionNetwork):
 
         self.log("loss/total_loss", total_loss.sum(), sync_dist=True)
 
+        print("Returning from train_step")
         return total_loss.mean()
