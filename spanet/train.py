@@ -21,8 +21,7 @@ from pytorch_lightning.callbacks import (
     TQDMProgressBar
 )
 
-from spanet import JetReconstructionModel, Options
-from spanet.network.jet_reconstruction import DataModule
+from spanet import JetReconstructionModel, Options, DataModule
 
 def main(
         event_file: str,
