@@ -22,7 +22,7 @@ from pytorch_lightning.callbacks import (
 )
 
 from spanet import JetReconstructionModel, Options
-
+from spanet.network.jet_reconstruction import DataModule
 
 def main(
         event_file: str,
@@ -185,7 +185,8 @@ def main(
 
         shutil.copy2(options.event_info_file, f"{trainer.logger.log_dir}/event.yaml")
 
-    trainer.fit(model, data_module=model.dataloader(), ckpt_path=checkpoint)
+    model_data_module = DataModule({"batch_size": options.batch_size, "pin_memory": options.num_gpu > 0, "num_workers": options.num_dataloader_workers}, training_file, validation_file)
+    trainer.fit(model, data_module=model_data_module, ckpt_path=checkpoint)
     # -------------------------------------------------------------------------------------------------------
 
 
