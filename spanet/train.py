@@ -185,8 +185,8 @@ def main(
 
         shutil.copy2(options.event_info_file, f"{trainer.logger.log_dir}/event.yaml")
 
-    model_data_module = DataModule({"batch_size": options.batch_size, "pin_memory": options.num_gpu > 0, "num_workers": options.num_dataloader_workers}, training_file, validation_file)
-    trainer.fit(model, data_module=model_data_module, ckpt_path=checkpoint)
+    model_data_module = DataModule(options, training_file, validation_file)
+    trainer.fit(model, datamodule=model_data_module, ckpt_path=checkpoint)
     # -------------------------------------------------------------------------------------------------------
 
 
