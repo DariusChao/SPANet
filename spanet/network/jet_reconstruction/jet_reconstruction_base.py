@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from spanet.network.jet_reconstruction import DataModule
+from spanet.network.jet_reconstruction.jet_data_module import JetReconstructionDataModule
 from spanet.options import Options
 from spanet.dataset.jet_reconstruction_dataset import JetReconstructionDataset
 from spanet.network.learning_rate_schedules import get_linear_schedule_with_warmup
@@ -17,12 +17,12 @@ class JetReconstructionBase(pl.LightningModule):
         self.save_hyperparameters(options)
         self.options = options
 
-        self.training_dataset, self.validation_dataset, self.testing_dataset = self.create_datasets()
-
+        self.data_module = JetReconstructionDataModule(options)
+        
         # Compute class weights for particles from the training dataset target distribution
         self.balance_particles = False
         if options.balance_particles and options.partial_events:
-            index_tensor, weights_tensor = self.training_dataset.compute_particle_balance()
+            index_tensor, weights_tensor = self.data_module.training_dataset.compute_particle_balance()
             self.particle_index_tensor = torch.nn.Parameter(index_tensor, requires_grad=False)
             self.particle_weights_tensor = torch.nn.Parameter(weights_tensor, requires_grad=False)
             self.balance_particles = True
@@ -30,7 +30,7 @@ class JetReconstructionBase(pl.LightningModule):
         # Compute class weights for jets from the training dataset target distribution
         self.balance_jets = False
         if options.balance_jets:
-            jet_weights_tensor = self.training_dataset.compute_vector_balance()
+            jet_weights_tensor = self.data_module.training_dataset.compute_vector_balance()
             self.jet_weights_tensor = torch.nn.Parameter(jet_weights_tensor, requires_grad=False)
             self.balance_jets = True
 
@@ -38,7 +38,7 @@ class JetReconstructionBase(pl.LightningModule):
         if self.balance_classifications:
             classification_weights = {
                 key: torch.nn.Parameter(value, requires_grad=False)
-                for key, value in self.training_dataset.compute_classification_balance().items()
+                for key, value in self.data_module.training_dataset.compute_classification_balance().items()
             }
 
             self.classification_weights = torch.nn.ParameterDict(classification_weights)
@@ -50,67 +50,14 @@ class JetReconstructionBase(pl.LightningModule):
 
         # Helper variables for keeping track of the number of batches in each epoch.
         # Used for learning rate scheduling and other things.
-        self.steps_per_epoch = len(self.training_dataset) // (self.options.batch_size * max(1, self.options.num_gpu))
-        # self.steps_per_epoch = len(self.training_dataset) // self.options.batch_size
+        self.steps_per_epoch = len(self.data_module.training_dataset) // (self.options.batch_size * max(1, self.options.num_gpu))
+        # self.steps_per_epoch = len(self.data_module.training_dataset) // self.options.batch_size
         self.total_steps = self.steps_per_epoch * self.options.epochs
         self.warmup_steps = int(round(self.steps_per_epoch * self.options.learning_rate_warmup_epochs))
-        
-    @property
-    def dataset(self):
-        return JetReconstructionDataset
 
     @property
     def event_info(self):
-        return self.training_dataset.event_info
-
-    def create_datasets(self):
-        event_info_file = self.options.event_info_file
-        training_file = self.options.training_file
-        validation_file = self.options.validation_file
-
-        training_range = self.options.dataset_limit
-        validation_range = 1.0
-
-        # If we dont have a validation file provided, create one from the training file.
-        if len(validation_file) == 0:
-            validation_file = training_file
-
-            # Compute the training / validation ranges based on the data-split and the limiting percentage.
-            train_validation_split = self.options.dataset_limit * self.options.train_validation_split
-            training_range = (0.0, train_validation_split)
-            validation_range = (train_validation_split, self.options.dataset_limit)
-
-        # Construct primary training datasets
-        # Note that only the training dataset should be limited to full events or partial events.
-        training_dataset = self.dataset(
-            data_file=training_file,
-            event_info=event_info_file,
-            limit_index=training_range,
-            vector_limit=self.options.limit_to_num_jets,
-            partial_events=self.options.partial_events,
-            randomization_seed=self.options.dataset_randomization
-        )
-
-        validation_dataset = self.dataset(
-            data_file=validation_file,
-            event_info=event_info_file,
-            limit_index=validation_range,
-            vector_limit=self.options.limit_to_num_jets,
-            randomization_seed=self.options.dataset_randomization
-        )
-
-        # Optionally construct the testing dataset.
-        # This is not used in the main training script but is still useful for testing later.
-        testing_dataset = None
-        if len(self.options.testing_file) > 0:
-            testing_dataset = self.dataset(
-                data_file=self.options.testing_file,
-                event_info=self.options.event_info_file,
-                limit_index=1.0,
-                vector_limit=self.options.limit_to_num_jets
-            )
-
-        return training_dataset, validation_dataset, testing_dataset
+        return self.data_module.training_dataset.event_info
 
     def configure_optimizers(self):
         optimizer = None
