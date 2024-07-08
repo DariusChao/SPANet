@@ -18,7 +18,7 @@ class JetReconstructionBase(pl.LightningModule):
         self.options = options
 
         self.data_module = JetReconstructionDataModule(options)
-        
+        print("Data", self.data_module)
         # Compute class weights for particles from the training dataset target distribution
         self.balance_particles = False
         if options.balance_particles and options.partial_events:
@@ -59,6 +59,10 @@ class JetReconstructionBase(pl.LightningModule):
     def event_info(self):
         return self.data_module.training_dataset.event_info
 
+    @property
+    def data_module(self):
+        return self.data_module
+    
     def configure_optimizers(self):
         optimizer = None
 
