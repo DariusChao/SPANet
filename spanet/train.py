@@ -21,7 +21,7 @@ from pytorch_lightning.callbacks import (
     TQDMProgressBar
 )
 
-from spanet import JetReconstructionModel, Options, DataModule
+from spanet import JetReconstructionModel, Options
 
 def main(
         event_file: str,
@@ -184,7 +184,6 @@ def main(
 
         shutil.copy2(options.event_info_file, f"{trainer.logger.log_dir}/event.yaml")
 
-    model_data_module = DataModule(options, training_file, validation_file)
     trainer.fit(model, datamodule=model_data_module, ckpt_path=checkpoint)
     # -------------------------------------------------------------------------------------------------------
 
