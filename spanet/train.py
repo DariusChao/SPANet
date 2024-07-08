@@ -184,7 +184,7 @@ def main(
 
         shutil.copy2(options.event_info_file, f"{trainer.logger.log_dir}/event.yaml")
 
-    trainer.fit(model, datamodule=model_data_module, ckpt_path=checkpoint)
+    trainer.fit(model, datamodule=model.data_module, ckpt_path=checkpoint)
     # -------------------------------------------------------------------------------------------------------
 
 
