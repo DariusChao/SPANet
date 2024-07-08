@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from spanet.dataset.jet_reconstruction_dataset import JetReconstructionDataset
 from spanet.options import Options
 
-class DataModule(LightningDataModule):
+class JetReconstructionDataModule(LightningDataModule):
     def __init__(self, options: Options):
         super().__init__()
         self.options = options
