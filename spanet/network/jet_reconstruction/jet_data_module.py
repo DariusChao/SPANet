@@ -14,7 +14,7 @@ class JetReconstructionDataModule(LightningDataModule):
     def prepare_data(self):
         pass
         
-    def setup(self):
+    def setup(self, stage: str):
         pass
         
     def train_dataloader(self):
