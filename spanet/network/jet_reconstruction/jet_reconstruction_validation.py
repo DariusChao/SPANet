@@ -122,16 +122,16 @@ class JetReconstructionValidation(JetReconstructionNetwork):
         stacked_targets = np.zeros(num_targets, dtype=object)
         stacked_masks = np.zeros((num_targets, batch_size), dtype=bool)
         for i, (target, mask) in enumerate(targets):
-            stacked_targets[i] = target.detach().cpu().numpy()
-            stacked_masks[i] = mask.detach().cpu().numpy()
+            stacked_targets[i] = target.detach()
+            stacked_masks[i] = mask.detach()
 
         regression_targets = {
-            key: value.detach().cpu().numpy()
+            key: value.detach()
             for key, value in regression_targets.items()
         }
 
         classification_targets = {
-            key: value.detach().cpu().numpy()
+            key: value.detach()
             for key, value in classification_targets.items()
         }
 
