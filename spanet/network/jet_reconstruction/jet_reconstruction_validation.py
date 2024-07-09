@@ -35,7 +35,6 @@ class JetReconstructionValidation(JetReconstructionNetwork):
         }
 
     def compute_metrics(self, jet_predictions, particle_scores, stacked_targets, stacked_masks):
-        print("Start compute metrics")
         event_permutation_group = self.event_permutation_tensor.cpu().numpy()
         num_permutations = len(event_permutation_group)
         num_targets, batch_size = stacked_masks.shape
@@ -91,27 +90,10 @@ class JetReconstructionValidation(JetReconstructionNetwork):
         # early stopping, hyperparameter optimization, learning rate scheduling, etc.
         metrics["validation_accuracy"] = metrics[f"jet/accuracy_{num_targets}_of_{num_targets}"]
 
-        print("start validation_average_jet_accuracy")
-        print("calc jfta")
-
-        jet_full_target_accuracies = jet_accuracies / np.clip(num_particles, a_min=1.0, a_max=None)
-
-        print("init weight")
-
-        weights = np.ones_like(jet_full_target_accuracies)
-
-        print('calc vaja')
-
-        metrics["validation_average_jet_accuracy"] = (jet_full_target_accuracies * weights).sum() / weights.sum()
-
-        print("finishing vaja")
-        print("return from compute metrics")
-
         return metrics
 
     def validation_step(self, batch, batch_idx) -> Dict[str, np.float32]:
         # Run the base prediction step
-        print("Start validation")
         sources, num_jets, targets, regression_targets, classification_targets = batch
         jet_predictions, particle_scores, regressions, classifications = self.predict(sources)
 
@@ -122,16 +104,16 @@ class JetReconstructionValidation(JetReconstructionNetwork):
         stacked_targets = np.zeros(num_targets, dtype=object)
         stacked_masks = np.zeros((num_targets, batch_size), dtype=bool)
         for i, (target, mask) in enumerate(targets):
-            stacked_targets[i] = target.detach()
-            stacked_masks[i] = mask.detach()
+            stacked_targets[i] = target.detach().cpu().numpy()
+            stacked_masks[i] = mask.detach().cpu().numpy()
 
         regression_targets = {
-            key: value.detach()
+            key: value.detach().cpu().numpy()
             for key, value in regression_targets.items()
         }
 
         classification_targets = {
-            key: value.detach()
+            key: value.detach().cpu().numpy()
             for key, value in classification_targets.items()
         }
 
@@ -144,11 +126,7 @@ class JetReconstructionValidation(JetReconstructionNetwork):
                     prediction[:, indices] = np.sort(prediction[:, indices])
                     target[:, indices] = np.sort(target[:, indices])
 
-        print("before update")
-
         metrics.update(self.compute_metrics(jet_predictions, particle_scores, stacked_targets, stacked_masks))
-
-        print("after update")
 
         for key in regressions:
             delta = regressions[key] - regression_targets[key]
@@ -169,16 +147,11 @@ class JetReconstructionValidation(JetReconstructionNetwork):
             accuracy = (classifications[key] == classification_targets[key])
             self.log(f"CLASSIFICATION/{key}_accuracy", accuracy.mean(), sync_dist=True)
 
-        print("logging")
-
         for name, value in metrics.items():
             if not np.isnan(value):
                 self.log(name, value, sync_dist=True, on_epoch=True)
 
         # self.validation_step_metrics_outputs.append(metrics)
-
-        print("after logging")
-        print("return from validation step")
 
         return metrics
 
@@ -203,5 +176,3 @@ class JetReconstructionValidation(JetReconstructionNetwork):
 #                self.log(name, value, sync_dist=True)
 #
 #        self.validation_step_metrics_outputs.clear()
-
-
