@@ -18,7 +18,7 @@ class JetReconstructionBase(pl.LightningModule):
         self.options = options
         self.training_dataset, self.validation_dataset, self.testing_dataset = self.create_datasets()
         
-        self.data_module = JetReconstructionDataModule(options, training_dataset, validation_dataset, testing_dataset)
+        self.data_module = JetReconstructionDataModule(options, self.training_dataset, self.validation_dataset, self.testing_dataset)
         # print("Data", self.data_module)
         # Compute class weights for particles from the training dataset target distribution
         self.balance_particles = False
