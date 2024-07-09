@@ -16,9 +16,10 @@ class JetReconstructionBase(pl.LightningModule):
 
         self.save_hyperparameters(options)
         self.options = options
+        self.training_dataset, self.validation_dataset, self.testing_dataset = self.create_datasets()
         
         self.data_module = JetReconstructionDataModule(options, training_dataset, validation_dataset, testing_dataset)
-        print("Data", self.data_module)
+        # print("Data", self.data_module)
         # Compute class weights for particles from the training dataset target distribution
         self.balance_particles = False
         if options.balance_particles and options.partial_events:
@@ -59,10 +60,6 @@ class JetReconstructionBase(pl.LightningModule):
     def event_info(self):
         return self.training_dataset.event_info
 
-    @property
-    def data_module(self):
-        return self.data_module
-
     def create_datasets(self):
         event_info_file = self.options.event_info_file
         training_file = self.options.training_file
@@ -82,7 +79,7 @@ class JetReconstructionBase(pl.LightningModule):
 
         # Construct primary training datasets
         # Note that only the training dataset should be limited to full events or partial events.
-        training_dataset = self.dataset(
+        training_dataset = JetReconstructionDataset(
             data_file=training_file,
             event_info=event_info_file,
             limit_index=training_range,
@@ -91,7 +88,7 @@ class JetReconstructionBase(pl.LightningModule):
             randomization_seed=self.options.dataset_randomization
         )
 
-        validation_dataset = self.dataset(
+        validation_dataset = JetReconstructionDataset(
             data_file=validation_file,
             event_info=event_info_file,
             limit_index=validation_range,
