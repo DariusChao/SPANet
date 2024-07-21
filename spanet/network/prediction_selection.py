@@ -1,64 +1,139 @@
-import torch
-from torch import Tensor
 from typing import List
+import numpy as np
 
-TArray = Tensor
+import numba
+from numba import njit
 
-TFloat32 = torch.float32
-TInt64 = torch.int64
+TArray = np.ndarray
+
+TFloat32 = numba.types.float32
+TInt64 = numba.types.int64
+
+TPrediction = numba.typed.typedlist.ListType(TFloat32[::1])
+TPredictions = numba.typed.typedlist.ListType(TFloat32[:, ::1])
+
+TResult = TInt64[:, ::1]
+TResults = TInt64[:, :, ::1]
 
 NUMBA_DEBUG = False
 
+
 if NUMBA_DEBUG:
-    def script(fn):
-        return fn
-else:
-    script = torch.jit.script
+    def njit(*args, **kwargs):
+        def wrapper(function):
+            return function
+        return wrapper
 
 
-@script
-def mask_1(data: Tensor, size: int, index: int, value: float):
+@njit("void(float32[::1], int64, int64, float32)")
+def mask_1(data, size, index, value):
     data[index] = value
 
 
-@script
-def mask_2(flat_data: Tensor, size: int, index: int, value: float):
-    data = flat_data.view(size, size)
+@njit("void(float32[::1], int64, int64, float32)")
+def mask_2(flat_data, size, index, value):
+    data = flat_data.reshape((size, size))
     data[index, :] = value
     data[:, index] = value
 
 
-@script
-def mask_3(flat_data: Tensor, size: int, index: int, value: float):
-    data = flat_data.view(size, size, size)
+@njit("void(float32[::1], int64, int64, float32)")
+def mask_3(flat_data, size, index, value):
+    data = flat_data.reshape((size, size, size))
     data[index, :, :] = value
     data[:, index, :] = value
     data[:, :, index] = value
 
 
-@script
-def mask_jet(data: Tensor, num_partons: int, max_jets: int, index: int, value: float):
+# @njit("void(float32[::1], int64, int64, float32)")
+# def mask_4(flat_data, size, index, value):
+#     data = flat_data.reshape((size, size, size, size))
+#     data[index, :, :, :] = value
+#     data[:, index, :, :] = value
+#     data[:, :, index, :] = value
+#     data[:, :, :, index] = value
+
+
+# @njit("void(float32[::1], int64, int64, float32)")
+# def mask_5(flat_data, size, index, value):
+#     data = flat_data.reshape((size, size, size, size, size))
+#     data[index, :, :, :, :] = value
+#     data[:, index, :, :, :] = value
+#     data[:, :, index, :, :] = value
+#     data[:, :, :, index, :] = value
+#     data[:, :, :, :, index] = value
+#
+#
+# @njit("void(float32[::1], int64, int64, float32)")
+# def mask_6(flat_data, size, index, value):
+#     data = flat_data.reshape((size, size, size, size, size, size))
+#     data[index, :, :, :, :, :] = value
+#     data[:, index, :, :, :, :] = value
+#     data[:, :, index, :, :, :] = value
+#     data[:, :, :, index, :, :] = value
+#     data[:, :, :, :, index, :] = value
+#     data[:, :, :, :, :, index] = value
+
+
+# @njit("void(float32[::1], int64, int64, float32)")
+# def mask_7(flat_data, size, index, value):
+#     data = flat_data.reshape((size, size, size, size, size, size, size))
+#     data[index, :, :, :, :, :, :] = value
+#     data[:, index, :, :, :, :, :] = value
+#     data[:, :, index, :, :, :, :] = value
+#     data[:, :, :, index, :, :, :] = value
+#     data[:, :, :, :, index, :, :] = value
+#     data[:, :, :, :, :, index, :] = value
+#     data[:, :, :, :, :, :, index] = value
+#
+#
+# @njit("void(float32[::1], int64, int64, float32)")
+# def mask_8(flat_data, size, index, value):
+#     data = flat_data.reshape((size, size, size, size, size, size, size, size))
+#     data[index, :, :, :, :, :, :, :] = value
+#     data[:, index, :, :, :, :, :, :] = value
+#     data[:, :, index, :, :, :, :, :] = value
+#     data[:, :, :, index, :, :, :, :] = value
+#     data[:, :, :, :, index, :, :, :] = value
+#     data[:, :, :, :, :, index, :, :] = value
+#     data[:, :, :, :, :, :, index, :] = value
+#     data[:, :, :, :, :, :, :, index] = value
+
+
+@njit("void(float32[::1], int64, int64, int64, float32)")
+def mask_jet(data, num_partons, max_jets, index, value):
     if num_partons == 1:
         mask_1(data, max_jets, index, value)
     elif num_partons == 2:
         mask_2(data, max_jets, index, value)
     elif num_partons == 3:
         mask_3(data, max_jets, index, value)
+    # elif num_partons == 4:
+    #     mask_4(data, max_jets, index, value)
+    # elif num_partons == 5:
+    #     mask_5(data, max_jets, index, value)
+    # elif num_partons == 6:
+    #     mask_6(data, max_jets, index, value)
+    # elif num_partons == 7:
+    #     mask_7(data, max_jets, index, value)
+    # elif num_partons == 8:
+    #     mask_8(data, max_jets, index, value)
 
 
-@script
-def compute_strides(num_partons: int, max_jets: int) -> Tensor:
-    strides = torch.zeros(num_partons, dtype=torch.int64)
+@njit("int64[::1](int64, int64)")
+def compute_strides(num_partons, max_jets):
+    strides = np.zeros(num_partons, dtype=np.int64)
     strides[-1] = 1
     for i in range(num_partons - 2, -1, -1):
         strides[i] = strides[i + 1] * max_jets
+
     return strides
 
 
-@script
-def unravel_index(index: int, strides: Tensor) -> Tensor:
+@njit(TInt64[::1](TInt64, TInt64[::1]))
+def unravel_index(index, strides):
     num_partons = strides.shape[0]
-    result = torch.zeros(num_partons, dtype=torch.int64)
+    result = np.zeros(num_partons, dtype=np.int64)
 
     remainder = index
     for i in range(num_partons):
@@ -67,20 +142,20 @@ def unravel_index(index: int, strides: Tensor) -> Tensor:
     return result
 
 
-@script
-def ravel_index(index: Tensor, strides: Tensor) -> int:
-    return (index * strides).sum().item()
+@njit(TInt64(TInt64[::1], TInt64[::1]))
+def ravel_index(index, strides):
+    return (index * strides).sum()
 
 
-@script
-def maximal_prediction(predictions: List[Tensor]):
+@njit(numba.types.Tuple((TInt64, TInt64, TFloat32))(TPrediction))
+def maximal_prediction(predictions):
     best_jet = -1
     best_prediction = -1
-    best_value = -float('inf')
+    best_value = -np.float32(np.inf)
 
     for i in range(len(predictions)):
-        max_jet = torch.argmax(predictions[i]).item()
-        max_value = predictions[i][max_jet].item()
+        max_jet = np.argmax(predictions[i])
+        max_value = predictions[i][max_jet]
 
         if max_value > best_value:
             best_prediction = i
@@ -90,22 +165,27 @@ def maximal_prediction(predictions: List[Tensor]):
     return best_jet, best_prediction, best_value
 
 
-@script
-def extract_prediction(predictions: List[Tensor], num_partons: Tensor, max_jets: int) -> Tensor:
-    float_negative_inf = -float('inf')
-    max_partons = num_partons.max().item()
+@njit(TResult(TPrediction, TInt64[::1], TInt64))
+def extract_prediction(predictions, num_partons, max_jets):
+    float_negative_inf = -np.float32(np.inf)
+    max_partons = num_partons.max()
     num_targets = len(predictions)
 
+    # Create copies of predictions for safety and calculate the output shapes
     strides = []
     for i in range(num_targets):
-        strides.append(compute_strides(num_partons[i].item(), max_jets))
+        strides.append(compute_strides(num_partons[i], max_jets))
 
-    results = torch.full((num_targets, max_partons), -2, dtype=torch.int64)
+    # Fill up the prediction matrix
+    # -2 : Not yet assigned
+    # -1 : Masked value
+    # else : The actual index value
+    results = np.zeros((num_targets, max_partons), np.int64) - 2
 
     for _ in range(num_targets):
         best_jet, best_prediction, best_value = maximal_prediction(predictions)
 
-        if not torch.isfinite(torch.tensor(best_value)):
+        if not np.isfinite(best_value):
             return results
 
         best_jets = unravel_index(best_jet, strides[best_prediction])
@@ -117,28 +197,28 @@ def extract_prediction(predictions: List[Tensor], num_partons: Tensor, max_jets:
         predictions[best_prediction][:] = float_negative_inf
         for i in range(num_targets):
             for jet in best_jets:
-                mask_jet(predictions[i], num_partons[i].item(), max_jets, jet.item(), float_negative_inf)
+                mask_jet(predictions[i], num_partons[i], max_jets, jet, float_negative_inf)
 
     return results
 
 
-@script
-def _extract_predictions(predictions: List[Tensor], num_partons: Tensor, max_jets: int, batch_size: int) -> Tensor:
-    output = torch.zeros(batch_size, len(predictions), num_partons.max().item(), dtype=torch.int64)
-    predictions = [p.clone() for p in predictions]
+@njit(TResults(TPredictions, TInt64[::1], TInt64, TInt64), parallel=True)
+def _extract_predictions(predictions, num_partons, max_jets, batch_size):
+    output = np.zeros((batch_size, len(predictions), num_partons.max()), np.int64)
+    predictions = [p.copy() for p in predictions]
 
-    for batch in range(batch_size):
-        current_prediction = [prediction[batch] for prediction in predictions]
+    for batch in numba.prange(batch_size):
+        current_prediction = numba.typed.List([prediction[batch] for prediction in predictions])
         output[batch, :, :] = extract_prediction(current_prediction, num_partons, max_jets)
 
-    return output.permute(1, 0, 2).contiguous()
+    return np.ascontiguousarray(output.transpose((1, 0, 2)))
 
 
-def extract_predictions(predictions: List[Tensor]):
-    flat_predictions = [p.view(p.size(0), -1) for p in predictions]
-    num_partons = torch.tensor([len(p.size()) - 1 for p in predictions], dtype=torch.int64)
-    max_jets = max(max(p.size()[1:]) for p in predictions)
-    batch_size = max(p.size(0) for p in predictions)
+def extract_predictions(predictions: List[TArray]):
+    flat_predictions = numba.typed.List([p.reshape((p.shape[0], -1)) for p in predictions])
+    num_partons = np.array([len(p.shape) - 1 for p in predictions])
+    max_jets = max(max(p.shape[1:]) for p in predictions)
+    batch_size = max(p.shape[0] for p in predictions)
 
     results = _extract_predictions(flat_predictions, num_partons, max_jets, batch_size)
     return [result[:, :partons] for result, partons in zip(results, num_partons)]
